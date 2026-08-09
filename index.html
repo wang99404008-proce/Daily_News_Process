@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.5">
+    <title>新聞產出管理系統（全功能雲端版）</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Microsoft JhengHei", Arial, sans-serif; background-color: #f4f6f9; color: #333; display: flex; height: 100vh; overflow: hidden; }
+
+        /* 左側收折選單 */
+        .sidebar { width: 250px; background-color: #2c3e50; color: #fff; transition: all 0.3s ease; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar.collapsed { width: 60px; }
+        .sidebar-header { padding: 15px; background: #1a252f; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-header h3 { font-size: 16px; white-space: nowrap; overflow: hidden; }
+        .sidebar.collapsed .sidebar-header h3 { display: none; }
+        .toggle-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+        .nav-links { list-style: none; margin-top: 10px; }
+        .nav-links li { padding: 15px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; white-space: nowrap; overflow: hidden; }
+        .nav-links li:hover, .nav-links li.active { background-color: #34495e; border-left: 4px solid #3498db; }
+        .nav-links li span.text { transition: opacity 0.2s; }
+        .sidebar.collapsed .nav-links li span.text { opacity: 0; display: none; }
+
+        /* 主內容區 */
+        .main-content { flex: 1; padding: 20px; overflow-y: auto; background-color: #f4f6f9; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        
+        /* 工具列與按鈕 */
+        .toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        button { padding: 8px 14px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        button:hover { background: #2980b9; }
+        button.btn-success { background: #2ecc71; } button.btn-success:hover { background: #27ae60; }
+        button.btn-danger { background: #e74c3c; } button.btn-danger:hover { background: #c0392b; }
+        .settings-box { background: #ecf0f1; padding: 12px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+
+        /* 表格樣式 */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; }
+        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: center; }
+        th { background-color: #2c3e50; color: white; position: sticky; top: 0; z-index: 10; }
+        
+        tr.unchecked-row { background-color: #fdf2f2 !important; }
+        
+        input, select { width: 100%; padding: 5px; border: 1px solid transparent; background: transparent; border-radius: 4px; text-align: center; }
+        input:focus, select:focus { border: 1px solid #3498db; background: #fff; outline: none; }
+        input[type="text"] { text-align: left; }
+        
+        .add-row-tr input, .add-row-tr select { border: 1px solid #cbd5e1; background: #fff; }
+
+        /* 機台使用狀態區塊 */
+        .machine-status-container { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; align-items: center; }
+        .machine-badge { padding: 8px 12px; border-radius: 6px; font-weight: bold; font-size: 13px; text-align: center; min-width: 55px; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .machine-blue { background-color: #3182ce; color: #ffffff; border-color: #2b6cb0; } 
+        .machine-yellow { background-color: #d69e2e; color: #ffffff; border-color: #b7791f; } 
+        .machine-free { background-color: #edf2f7; color: #a0aec0; border-color: #e2e8f0; } 
+        
+        /* 統計面板排版 */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px; }
+        .stat-card { background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .stat-card h4 { margin-bottom: 10px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* 日誌查詢篩選面板 */
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 15px; background: #ecf0f1; padding: 15px; border-radius: 6px; }
+        .matrix-table th { background: #34495e; color: #fff; font-size: 12px; }
+        .matrix-table td { font-size: 12px; background: #fff; }
+    </style>
+</head>
+<body>
+
+    <!-- 左側收折選單 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3>新聞產出系統</h3>
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+        </div>
+        <ul class="nav-links">
+            <li class="active" onclick="switchPage('page1', this)">
+                <span>📋</span><span class="text">每日新聞產出表</span>
+            </li>
+            <li onclick="switchPage('page2', this)">
+                <span>📊</span><span class="text">數據統計</span>
+            </li>
+            <li onclick="switchPage('page3', this)">
+                <span>🔍</span><span class="text">日誌/資料查詢</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 主內容區 -->
+    <div class="main-content">
+        <!-- 頁面 1：每日工作表單 -->
+        <div id="page1" class="page active">
+            <div class="card">
+                <h2>📋 2026 每日新聞產出表</h2>
+                
+                <div style="margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">🖥️ 機台使用狀態即時預覽（藍色：未填剪接 / 飽和黃色：已填剪接）：</div>
+                <div id="machineStatusDashboard" class="machine-status-container"></div>
+
+                <div class="toolbar">
+                    <button onclick="saveData()">💾 儲存並同步至雲端</button>
+                    <button onclick="loadDataFromCloud()" style="background: #27ae60;">🔄 重新載入雲端資料</button>
+                    <span id="saveStatus" style="color: green; font-weight: bold;"></span>
+                </div>
+                <div style="overflow-x: auto; max-height: 60vh;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 70px;">製作日</th>
+                                <th style="width: 60px;">組別</th>
+                                <th>SLUG</th>
+                                <th style="width: 90px;">文字</th>
+                                <th style="width: 70px;">播出日</th>
+                                <th style="width: 75px;">類型</th>
+                                <th style="width: 60px;">時段</th>
+                                <th style="width: 90px;">特別標記</th>
+                                <th style="width: 90px;">上字</th>
+                                <th style="width: 80px;">剪接</th>
+                                <th style="width: 70px;">機台</th>
+                                <th style="width: 50px;">丟帶</th>
+                                <th>備註</th>
+                                <th style="width: 60px;">狀態</th>
+                                <th style="width: 40px;">刪除</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁面 2：專業數據統計 -->
+        <div id="page2" class="page">
+            <div class="card">
+                <h2>📊 專業數據統計與報表中心</h2>
+                <div class="stats-grid" style="margin-top: 15px;">
+                    
+                    <!-- 1. 每日各類型剪接績效矩陣 -->
+                    <div class="stat-card" style="grid-column: 1 / -1;">
+                        <h4>
+                            <span>🎬 每日各類型剪接績效矩陣</span>
+                            <input type="date" id="statDailyDate" onchange="renderDailyEditorMatrix()" style="width: 160px; font-size: 13px; border: 1px solid #cbd5e1; padding: 4px; background:#fff; border-radius:4px;">
+                        </h4>
+                        <div style="overflow-x: auto;" id="matrixDailyEditorContainer"></div>
+                    </div>
+
+                    <!-- 2. 月份各類型上字矩陣 -->
+                    <div class="stat-card" style="grid-column: 1 / -1;">
+                        <h4>
+                            <span>📝 每月各類型上字紀錄表</span>
+                            <div style="display:flex; gap:8px;">
+                                <select id="statMonthYear" onchange="renderMonthlySubtitleMatrix()" style="width: 90px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                                <select id="statMonthNum" onchange="renderMonthlySubtitleMatrix()" style="width: 80px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                            </div>
+                        </h4>
+                        <div style="overflow-x: auto;" id="matrixMonthlySubtitleContainer"></div>
+                    </div>
+
+                    <!-- 3. 個人年度每月上字與則數統計 -->
+                    <div class="stat-card">
+                        <h4>
+                            <span>👤 個人年度產出與上字統計</span>
+                            <div style="display:flex; gap:8px;">
+                                <select id="statPersonName" onchange="renderPersonalYearlyStats()" style="width: 90px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                                <select id="statPersonYear" onchange="renderPersonalYearlyStats()" style="width: 90px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                            </div>
+                        </h4>
+                        <div style="overflow-x: auto;" id="personalYearlyStatsContainer"></div>
+                    </div>
+
+                    <!-- 4. 組別累積上字排行 -->
+                    <div class="stat-card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <h4 style="color: #276749; border-bottom-color: #38a169;">🌍 國際組上字統計</h4>
+                            <div id="intlSubtitleRankingContainer"></div>
+                        </div>
+                        <div>
+                            <h4 style="color: #c05621; border-bottom-color: #ed8936;">🤝 志工組上字統計</h4>
+                            <div id="volunteerSubtitleRankingContainer"></div>
+                        </div>
+                    </div>
+
+                    <!-- 5. 年度各組每月產出與日平均總表 -->
+                    <div class="stat-card" style="grid-column: 1 / -1;">
+                        <h4>
+                            <span>📈 年度各組每月產出與日平均總表</span>
+                            <select id="statGroupYear" onchange="renderGroupMonthlySummary()" style="width: 100px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                        </h4>
+                        <div style="overflow-x: auto;" id="groupMonthlySummaryContainer"></div>
+                    </div>
+
+                    <!-- 6. 機台使用次數排行 -->
+                    <div class="stat-card">
+                        <h4>💻 機台使用次數排行</h4>
+                        <div style="overflow-x: auto; max-height: 250px;" id="machineStats"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁面 3：日誌查詢 -->
+        <div id="page3" class="page">
+            <div class="card">
+                <h2>🔍 日誌查詢</h2>
+                <div class="filter-grid">
+                    <input type="text" id="searchKeyword" oninput="filterData()" placeholder="🔍 搜尋 SLUG..." style="border: 1px solid #cbd5e1; background: #fff;">
+                    <input type="date" id="searchDate" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;" title="選擇日曆日期">
+                    <select id="searchGroup" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部組別</option></select>
+                    <select id="searchWriter" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部文字</option></select>
+                    <select id="searchEditor" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部剪接</option></select>
+                    <select id="searchCategory" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部類型</option></select>
+                    <select id="searchSpecialTag" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部特別標記</option></select>
+                    <select id="searchSubtitle" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部上字</option></select>
+                    <select id="searchMachine" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部機台</option></select>
+                </div>
+                <div style="margin-bottom: 10px; font-weight: bold; color: #555;" id="searchResultCount">符合條件筆數：0 筆</div>
+                <div style="overflow-x: auto; max-height: 55vh;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>製作日</th>
+                                <th>組別</th>
+                                <th>SLUG</th>
+                                <th>文字</th>
+                                <th>播出日</th>
+                                <th>類型</th>
+                                <th>時段</th>
+                                <th>特別標記</th>
+                                <th>上字</th>
+                                <th>剪接</th>
+                                <th>機台</th>
+                                <th>備註</th>
+                            </tr>
+                        </thead>
+                        <tbody id="searchResultsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ===== 請在這裡貼上你從 Google Apps Script 取得的「網頁應用程式網址」 =====
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbykLhDHqpdntQZ2M5DhVNc-0QiZLo1VSmof18L4tzn7ek3rNkMZWGhyiEwIRosxRx2L/exec";
+
+    let dropdownData = {
+        writers: {
+            "志工": ["秀", "以", "湘", "榮", "莉", "君", "珍", "採訪"],
+            "國際": ["瑜", "芳", "玉", "立", "羽", "桂"]
+        },
+        editors: ["泰", "文", "臻", "汪", "歆", "琍", "嵐", "谷", "民", "穎", "倫", "執行"],
+        categories: ["SOT", "SONS", "NS", "SO", "ROLL", "早安TC", "說新聞", "專案"],
+        machines: ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14", "執行"],
+        specialTags: ["處理帶", "早安TC", "說新聞", "921專題", "歷史今天"],
+        subtitles: ["旁白字", "上字", "mv上字", "整則上字", "片頭製作", "版型設計"]
+    };
+
+    let tableData = [];
+
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
+    function switchPage(pageId, element) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-links li').forEach(li => li.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        element.classList.add('active');
+        if(pageId === 'page2') initStatisticsPage();
+        if(pageId === 'page3') setupSearchFilters();
+    }
+
+    function loadDataFromCloud() {
+        if(WEB_APP_URL.includes("在此貼上")) {
+            alert("請先在程式碼中填入你的 Google 網頁應用程式網址！");
+            return;
+        }
+        document.getElementById('saveStatus').innerText = "🔄 正在同步雲端資料...";
+        fetch(WEB_APP_URL)
+            .then(response => response.json())
+            .then(data => {
+                tableData = data || [];
+                renderTable();
+                document.getElementById('saveStatus').innerText = "✅ 雲端同步完成";
+                setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 2000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('saveStatus').innerText = "❌ 同步失敗";
+            });
+    }
+
+    function saveData() {
+        if(WEB_APP_URL.includes("在此貼上")) {
+            alert("請先在程式碼中填入你的 Google 網頁應用程式網址！");
+            return;
+        }
+        document.getElementById('saveStatus').innerText = "💾 正在儲存至雲端...";
+        fetch(WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tableData)
+        })
+        .then(() => {
+            document.getElementById('saveStatus').innerText = "✅ 雲端儲存成功";
+            setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 2000);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('saveStatus').innerText = "❌ 儲存失敗";
+        });
+    }
+
+    function parseSlugAuto(slugVal, rowIndex) {
+        if (!slugVal) {
+            tableData[rowIndex].broadcastDate = "-";
+            tableData[rowIndex].timeSlot = "-";
+            tableData[rowIndex].category = "-";
+            tableData[rowIndex].group = "志工";
+            return;
+        }
+        let s = slugVal.trim();
+        tableData[rowIndex].group = s.includes('@') ? "國際" : "志工";
+
+        let dateMatch = s.match(/^(0[1-9]|1[0-2])([0-3][0-9])/);
+        if (dateMatch) {
+            let rawDate = dateMatch[0];
+            tableData[rowIndex].broadcastDate = parseInt(rawDate.substring(0,2)) + '/' + parseInt(rawDate.substring(2,4));
+            s = s.substring(4).trim();
+        } else {
+            tableData[rowIndex].broadcastDate = "-";
+        }
+
+        let timeMatch = s.match(/(\d{4})$/);
+        if (timeMatch) {
+            tableData[rowIndex].timeSlot = timeMatch[1];
+            s = s.substring(0, s.length - 4).trim();
+        } else {
+            tableData[rowIndex].timeSlot = "-";
+        }
+
+        let upperS = s.toUpperCase();
+        let matchedCat = "";
+        ['SONS', 'NS', 'SO', 'ROLL', '早安TC', '說新聞', '專案'].forEach(cat => {
+            if (upperS.includes(cat)) matchedCat = cat;
+        });
+
+        tableData[rowIndex].category = matchedCat ? matchedCat : (s.length > 0 ? "SOT" : "-");
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        
+        tableData.forEach((row, index) => {
+            let tr = document.createElement('tr');
+            if (!row.checked) tr.className = "unchecked-row";
+            
+            tr.innerHTML = `
+                <td><input type="text" value="${row.date || ''}" onchange="updateData(${index}, 'date', this.value)" placeholder="8/9"></td>
+                <td><input type="text" value="${row.group || '志工'}" onchange="updateData(${index}, 'group', this.value)"></td>
+                <td><input type="text" value="${row.slug || ''}" onchange="updateSlug(${index}, this.value)" placeholder="SLUG"></td>
+                <td>${createWritersSelectHTML(row.writer, index, 'writer')}</td>
+                <td><input type="text" value="${row.broadcastDate || '-'}" onchange="updateData(${index}, 'broadcastDate', this.value)"></td>
+                <td>${createSelectHTML('categories', row.category, index, 'category')}</td>
+                <td><input type="text" value="${row.timeSlot || '-'}" onchange="updateData(${index}, 'timeSlot', this.value)"></td>
+                <td>${createSelectHTML('specialTags', row.specialTag, index, 'specialTag')}</td>
+                <td>${createSelectHTML('subtitles', row.subtitle, index, 'subtitle')}</td>
+                <td>${createSelectHTML('editors', row.editor, index, 'editor')}</td>
+                <td>${createSelectHTML('machines', row.machine, index, 'machine')}</td>
+                <td><input type="checkbox" ${row.checked ? 'checked' : ''} onchange="updateData(${index}, 'checked', this.checked)"></td>
+                <td><input type="text" value="${row.note || ''}" onchange="updateData(${index}, 'note', this.value)"></td>
+                <td><input type="text" value="${row.status || '完成'}" onchange="updateData(${index}, 'status', this.value)"></td>
+                <td><button class="btn-danger" style="padding:2px 6px;" onclick="deleteRow(${index})">✕</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // 底部新增列
+        let newTr = document.createElement('tr');
+        newTr.className = "add-row-tr";
+        newTr.style.background = "#eef2f7";
+        newTr.innerHTML = `
+            <td><input type="text" id="new_date" placeholder="8/9"></td>
+            <td><input type="text" id="new_group" value="志工"></td>
+            <td><input type="text" id="new_slug" placeholder="例: 0809標題1900" oninput="autoFillNewRow(this.value)" onkeydown="checkDirectAdd(event)"></td>
+            <td><select id="new_writer"><option value="">請選擇</option>${getWritersOptionsHTML('')}</select></td>
+            <td><input type="text" id="new_broadcastDate" value="-"></td>
+            <td><select id="new_category"><option value="-">-</option>${getOptionsHTML('categories', 'SOT')}</select></td>
+            <td><input type="text" id="new_timeSlot" value="-"></td>
+            <td><select id="new_specialTag"><option value="-">-</option>${getOptionsHTML('specialTags', '')}</select></td>
+            <td><select id="new_subtitle"><option value="-">-</option>${getOptionsHTML('subtitles', '')}</select></td>
+            <td><select id="new_editor"><option value="">請選擇</option>${getOptionsHTML('editors', '')}</select></td>
+            <td><select id="new_machine"><option value="">請選擇</option>${getOptionsHTML('machines', '')}</select></td>
+            <td><input type="checkbox" id="new_checked" checked></td>
+            <td><input type="text" id="new_note" placeholder="備註"></td>
+            <td><input type="text" id="new_status" value="完成"></td>
+            <td><button class="btn-success" style="padding:2px 6px;" onclick="submitNewRow()">＋</button></td>
+        `;
+        tbody.appendChild(newTr);
+        renderMachineDashboard();
+    }
+
+    function autoFillNewRow(slugVal) {
+        let bDateInput = document.getElementById('new_broadcastDate');
+        let tSlotInput = document.getElementById('new_timeSlot');
+        let catSelect = document.getElementById('new_category');
+        let groupInput = document.getElementById('new_group');
+
+        if (!slugVal || slugVal.trim() === "") {
+            bDateInput.value = "-";
+            tSlotInput.value = "-";
+            catSelect.value = "-";
+            groupInput.value = "志工";
+            return;
+        }
+
+        let s = slugVal.trim();
+        groupInput.value = s.includes('@') ? "國際" : "志工";
+
+        let dateMatch = s.match(/^(0[1-9]|1[0-2])([0-3][0-9])/);
+        if (dateMatch) {
+            let rawDate = dateMatch[0];
+            bDateInput.value = parseInt(rawDate.substring(0,2)) + '/' + parseInt(rawDate.substring(2,4));
+            s = s.substring(4).trim();
+        } else {
+            bDateInput.value = "-";
+        }
+
+        let timeMatch = s.match(/(\d{4})$/);
+        if (timeMatch) {
+            tSlotInput.value = timeMatch[1];
+            s = s.substring(0, s.length - 4).trim();
+        } else {
+            tSlotInput.value = "-";
+        }
+
+        let upperS = s.toUpperCase();
+        let matchedCat = "";
+        ['SONS', 'NS', 'SO', 'ROLL', '早安TC', '說新聞', '專案'].forEach(cat => {
+            if (upperS.includes(cat)) matchedCat = cat;
+        });
+
+        catSelect.value = matchedCat ? matchedCat : (s.length > 0 ? "SOT" : "-");
+    }
+
+    function getWritersOptionsHTML(defaultValue) {
+        let options = '';
+        for (let group in dropdownData.writers) {
+            options += `<optgroup label="${group}">`;
+            dropdownData.writers[group].forEach(item => {
+                let selected = (item === defaultValue) ? 'selected' : '';
+                options += `<option value="${item}" ${selected}>${item}</option>`;
+            });
+            options += `</optgroup>`;
+        }
+        return options;
+    }
+
+    function createWritersSelectHTML(currentValue, rowIndex, fieldName) {
+        let options = `<option value="">請選擇</option>`;
+        for (let group in dropdownData.writers) {
+            options += `<optgroup label="${group}">`;
+            dropdownData.writers[group].forEach(item => {
+                let selected = (item === currentValue) ? 'selected' : '';
+                options += `<option value="${item}" ${selected}>${item}</option>`;
+            });
+            options += `</optgroup>`;
+        }
+        return `<select onchange="updateData(${rowIndex}, '${fieldName}', this.value)">${options}</select>`;
+    }
+
+    function getOptionsHTML(type, defaultValue) {
+        let options = '';
+        dropdownData[type].forEach(item => {
+            let selected = (item === defaultValue) ? 'selected' : '';
+            options += `<option value="${item}" ${selected}>${item}</option>`;
+        });
+        return options;
+    }
+
+    function createSelectHTML(type, currentValue, rowIndex, fieldName) {
+        let options = `<option value="-">-</option>`;
+        dropdownData[type].forEach(item => {
+            let selected = (item === currentValue) ? 'selected' : '';
+            options += `<option value="${item}" ${selected}>${item}</option>`;
+        });
+        return `<select onchange="updateData(${rowIndex}, '${fieldName}', this.value)">${options}</select>`;
+    }
+
+    function checkDirectAdd(e) { if (e.key === 'Enter') submitNewRow(); }
+
+    function submitNewRow() {
+        const s = document.getElementById('new_slug').value.trim();
+        if (!s) { alert('請至少填寫 SLUG 標題！'); return; }
+
+        const tempIndex = tableData.length;
+        tableData.push({
+            date: document.getElementById('new_date').value.trim() || '',
+            group: document.getElementById('new_group').value || '志工',
+            slug: s,
+            writer: document.getElementById('new_writer').value,
+            broadcastDate: document.getElementById('new_broadcastDate').value || '-',
+            category: document.getElementById('new_category').value || '-',
+            timeSlot: document.getElementById('new_timeSlot').value || '-',
+            specialTag: document.getElementById('new_specialTag').value || '-',
+            subtitle: document.getElementById('new_subtitle').value || '-',
+            editor: document.getElementById('new_editor').value,
+            machine: document.getElementById('new_machine').value,
+            checked: document.getElementById('new_checked').checked,
+            note: document.getElementById('new_note').value.trim(),
+            status: document.getElementById('new_status').value.trim() || '完成'
+        });
+        parseSlugAuto(s, tempIndex);
+        saveData();
+        renderTable();
+    }
+    
+    function deleteRow(index) { 
+        if(confirm('確定刪除？')) { tableData.splice(index, 1); saveData(); renderTable(); } 
+    }
+
+    function updateData(index, field, value) { tableData[index][field] = value; }
+    function updateSlug(index, val) { tableData[index].slug = val; parseSlugAuto(val, index); renderTable(); }
+
+    function renderMachineDashboard() {
+        const dashboard = document.getElementById('machineStatusDashboard');
+        if(!dashboard) return;
+        dashboard.innerHTML = '';
+        dropdownData.machines.forEach(mach => {
+            let assignedRows = tableData.filter(row => row.machine === mach);
+            let badgeClass = "machine-free";
+            if (assignedRows.length > 0) {
+                let hasEditor = assignedRows.some(row => row.editor && row.editor.trim() !== "");
+                badgeClass = hasEditor ? "machine-yellow" : "machine-blue";
+            }
+            let badge = document.createElement('div');
+            badge.className = `machine-badge ${badgeClass}`;
+            badge.innerText = mach;
+            dashboard.appendChild(badge);
+        });
+    }
+
+    // ===== 統計圖表渲染邏輯 =====
+    function initStatisticsPage() {
+        const dateInput = document.getElementById('statDailyDate');
+        if (dateInput && !dateInput.value) {
+            let today = new Date();
+            dateInput.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        }
+
+        const yearSelect = document.getElementById('statMonthYear');
+        const monthSelect = document.getElementById('statMonthNum');
+        const personYearSelect = document.getElementById('statPersonYear');
+        const groupYearSelect = document.getElementById('statGroupYear');
+        const personNameSelect = document.getElementById('statPersonName');
+
+        let years = ["2025", "2026", "2027"];
+        let months = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+        if(yearSelect) yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+        if(personYearSelect) personYearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+        if(groupYearSelect) groupYearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+        if(monthSelect) monthSelect.innerHTML = months.map((m, idx) => `<option value="${idx+1}">${m}</option>`).join('');
+        if(monthSelect) monthSelect.value = "7";
+
+        let allWriters = [];
+        for(let g in dropdownData.writers) { allWriters = allWriters.concat(dropdownData.writers[g]); }
+        if(personNameSelect) personNameSelect.innerHTML = allWriters.map(w => `<option value="${w}">${w}</option>`).join('');
+
+        renderDailyEditorMatrix();
+        renderMonthlySubtitleMatrix();
+        renderPersonalYearlyStats();
+        renderSubtitleRankings();
+        renderGroupMonthlySummary();
+        renderMachineStats();
+    }
+
+    function renderDailyEditorMatrix() {
+        const dateVal = document.getElementById('statDailyDate')?.value;
+        let formattedDate = "";
+        if(dateVal) {
+            let parts = dateVal.split('-');
+            if(parts.length === 3) formattedDate = parseInt(parts[1]) + '/' + parseInt(parts[2]);
+        }
+        let editors = dropdownData.editors;
+        let categories = ["SOT", "處理帶", "留稿", "SONS", "NS", "SO", "ROLL", "早安TC", "說新聞", "專案"];
+
+        let html = `<table class="matrix-table"><thead><tr><th style="width:100px;">類型</th>`;
+        editors.forEach(e => html += `<th>${e}</th>`);
+        html += `<th style="background:#1a252f; color:#fff;">則數</th></tr></thead><tbody>`;
+
+        let editorTotals = {};
+        editors.forEach(e => editorTotals[e] = 0);
+        let grandTotal = 0;
+
+        categories.forEach(cat => {
+            html += `<tr><td style="font-weight:bold; background:#f8fafc;">${cat}</td>`;
+            let rowTotal = 0;
+            editors.forEach(e => {
+                let count = tableData.filter(row => (row.date === formattedDate || row.broadcastDate === formattedDate) && row.category === cat && row.editor === e).length;
+                rowTotal += count;
+                editorTotals[e] += count;
+                html += `<td>${count > 0 ? count : '<span style="color:#cbd5e1">0</span>'}</td>`;
+            });
+            html += `<td style="font-weight:bold; background:#f8fafc;">${rowTotal}</td></tr>`;
+            grandTotal += rowTotal;
+        });
+
+        html += `<tr style="font-weight:bold; background:#edf2f7;"><td>合計</td>`;
+        editors.forEach(e => html += `<td>${editorTotals[e]}</td>`);
+        html += `<td style="color:#c53030; font-size:14px;">${grandTotal}</td></tr></tbody></table>`;
+
+        let container = document.getElementById('matrixDailyEditorContainer');
+        if(container) container.innerHTML = html;
+    }
+
+    function renderMonthlySubtitleMatrix() {
+        const month = document.getElementById('statMonthNum')?.value || "7";
+        let editors = dropdownData.editors;
+        let subtitleTypes = ["上字", "旁白字", "mv上字", "整則上字", "片頭製作", "版型設計"];
+
+        let html = `<table class="matrix-table"><thead><tr><th style="width:100px;">類型</th>`;
+        editors.forEach(e => html += `<th>${e}</th>`);
+        html += `<th style="background:#1a252f; color:#fff;">總計</th></tr></thead><tbody>`;
+
+        let editorTotals = {};
+        editors.forEach(e => editorTotals[e] = 0);
+        let grandTotal = 0;
+
+        subtitleTypes.forEach(sub => {
+            html += `<tr><td style="font-weight:bold; background:#f8fafc;">${sub}</td>`;
+            let rowTotal = 0;
+            editors.forEach(e => {
+                let count = tableData.filter(row => {
+                    let d = row.broadcastDate || row.date || "";
+                    return d.startsWith(month + '/') && row.subtitle === sub && row.editor === e;
+                }).length;
+                rowTotal += count;
+                editorTotals[e] += count;
+                html += `<td>${count > 0 ? count : '<span style="color:#cbd5e1">0</span>'}</td>`;
+            });
+            html += `<td style="font-weight:bold; background:#f8fafc;">${rowTotal}</td></tr>`;
+            grandTotal += rowTotal;
+        });
+
+        html += `<tr style="font-weight:bold; background:#edf2f7;"><td>總計</td>`;
+        editors.forEach(e => html += `<td>${editorTotals[e]}</td>`);
+        html += `<td style="color:#2b6cb0; font-size:14px;">${grandTotal}</td></tr></tbody></table>`;
+
+        let container = document.getElementById('matrixMonthlySubtitleContainer');
+        if(container) container.innerHTML = html;
+    }
+
+    function renderPersonalYearlyStats() {
+        const person = document.getElementById('statPersonName')?.value;
+        const months = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+        let sotCounts = new Array(12).fill(0);
+        let subCounts = new Array(12).fill(0);
+
+        tableData.forEach(row => {
+            if (row.writer === person) {
+                let d = row.broadcastDate || row.date || "";
+                let parts = d.split('/');
+                if (parts.length >= 1) {
+                    let mIdx = parseInt(parts[0]) - 1;
+                    if (mIdx >= 0 && mIdx < 12) {
+                        if (row.category === "SOT") sotCounts[mIdx]++;
+                        if (row.subtitle && row.subtitle !== "-") subCounts[mIdx]++;
+                    }
+                }
+            }
+        });
+
+        let totalSot = sotCounts.reduce((a,b)=>a+b, 0);
+        let totalSub = subCounts.reduce((a,b)=>a+b, 0);
+        let overallPct = totalSot > 0 ? ((totalSub / totalSot) * 100).toFixed(1) + "%" : "0.0%";
+
+        let html = `<table class="matrix-table"><thead><tr><th style="background:#2b6cb0;">上字率</th>`;
+        months.forEach(m => html += `<th>${m}</th>`);
+        html += `<th>總次數</th></tr></thead><tbody>`;
+
+        html += `<tr><td style="font-weight:bold; background:#f8fafc;">SOT</td>`;
+        sotCounts.forEach(c => html += `<td>${c}</td>`);
+        html += `<td style="font-weight:bold;">${totalSot}</td></tr>`;
+
+        html += `<tr><td style="font-weight:bold; background:#f8fafc;">上字則數</td>`;
+        subCounts.forEach(c => html += `<td>${c}</td>`);
+        html += `<td style="font-weight:bold;">${totalSub}</td></tr>`;
+
+        html += `<tr><td style="font-weight:bold; background:#f8fafc;">百分比</td>`;
+        sotCounts.forEach((sot, idx) => {
+            let pct = sot > 0 ? ((subCounts[idx] / sot) * 100).toFixed(1) + "%" : "0.0%";
+            html += `<td>${pct}</td>`;
+        });
+        html += `<td style="color:#c53030; font-weight:bold;">${overallPct}</td></tr></tbody></table>`;
+
+        let container = document.getElementById('personalYearlyStatsContainer');
+        if(container) container.innerHTML = html;
+    }
+
+    function renderSubtitleRankings() {
+        let intlCounts = {};
+        let volCounts = {};
+        dropdownData.writers["國際"].forEach(w => intlCounts[w] = 0);
+        dropdownData.writers["志工"].forEach(w => volCounts[w] = 0);
+
+        tableData.forEach(row => {
+            if (row.writer && row.subtitle && row.subtitle !== "-") {
+                if (row.group === "國際" || dropdownData.writers["國際"].includes(row.writer)) {
+                    intlCounts[row.writer] = (intlCounts[row.writer] || 0) + 1;
+                } else if (row.group === "志工" || dropdownData.writers["志工"].includes(row.writer)) {
+                    volCounts[row.writer] = (volCounts[row.writer] || 0) + 1;
+                }
+            }
+        });
+
+        let intlArr = Object.entries(intlCounts).sort((a,b) => b[1] - a[1]);
+        let volArr = Object.entries(volCounts).sort((a,b) => b[1] - a[1]);
+        let intlTotal = intlArr.reduce((sum, item) => sum + item[1], 0);
+        let volTotal = volArr.reduce((sum, item) => sum + item[1], 0);
+
+        let intlHtml = `<div style="font-size:15px; font-weight:bold; margin-bottom:8px; color:#276749;">國際上字 <span style="float:right; font-size:18px;">${intlTotal}</span></div>`;
+        intlHtml += `<table><thead><tr><th>文字</th><th>上字統計</th></tr></thead><tbody>`;
+        intlArr.forEach(([name, count]) => { intlHtml += `<tr><td>${name}</td><td>${count}</td></tr>`; });
+        intlHtml += `</tbody></table>`;
+        if(document.getElementById('intlSubtitleRankingContainer')) document.getElementById('intlSubtitleRankingContainer').innerHTML = intlHtml;
+
+        let volHtml = `<div style="font-size:15px; font-weight:bold; margin-bottom:8px; color:#c05621;">志工上字 <span style="float:right; font-size:18px;">${volTotal}</span></div>`;
+        volHtml += `<table><thead><tr><th>文字</th><th>上字統計</th></tr></thead><tbody>`;
+        volArr.forEach(([name, count]) => { volHtml += `<tr><td>${name}</td><td>${count}</td></tr>`; });
+        volHtml += `</tbody></table>`;
+        if(document.getElementById('volunteerSubtitleRankingContainer')) document.getElementById('volunteerSubtitleRankingContainer').innerHTML = volHtml;
+    }
+
+    function renderGroupMonthlySummary() {
+        const months = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+        let volData = new Array(12).fill(0);
+        let intlData = new Array(12).fill(0);
+
+        tableData.forEach(row => {
+            let d = row.broadcastDate || row.date || "";
+            let parts = d.split('/');
+            if(parts.length >= 1) {
+                let mIdx = parseInt(parts[0]) - 1;
+                if(mIdx >= 0 && mIdx < 12) {
+                    if(row.group === "國際") intlData[mIdx]++;
+                    else volData[mIdx]++;
+                }
+            }
+        });
+
+        let daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        let html = `<table class="matrix-table"><thead><tr>
+            <th style="width:70px;">月份</th>
+            <th>則數(志工)</th><th>去年同期</th><th>日平均</th>
+            <th>則數(國際)</th><th>去年同期</th><th>日平均</th>
+            <th>每日總平均</th>
+        </tr></thead><tbody>`;
+
+        let totalVol = 0, totalIntl = 0;
+        months.forEach((m, idx) => {
+            let v = volData[idx];
+            let i = intlData[idx];
+            totalVol += v;
+            totalIntl += i;
+            let vAvg = (v / daysInMonth[idx]).toFixed(2);
+            let iAvg = (i / daysInMonth[idx]).toFixed(2);
+            let totalAvg = ((v + i) / daysInMonth[idx]).toFixed(2);
+
+            html += `<tr>
+                <td style="font-weight:bold; background:#f8fafc;">${m}</td>
+                <td>${v}</td><td style="color:#a0aec0;">-</td><td style="color:#2b6cb0;">${vAvg}</td>
+                <td>${i}</td><td style="color:#a0aec0;">-</td><td style="color:#2b6cb0;">${iAvg}</td>
+                <td style="font-weight:bold; color:#2c3e50;">${totalAvg}</td>
+            </tr>`;
+        });
+
+        html += `<tr style="font-weight:bold; background:#edf2f7;">
+            <td>總計</td>
+            <td style="color:#c53030;">${totalVol}</td><td style="color:#a0aec0;">-</td><td>-</td>
+            <td style="color:#c53030;">${totalIntl}</td><td style="color:#a0aec0;">-</td><td>-</td>
+            <td style="color:#2b6cb0;">-</td>
+        </tr></tbody></table>`;
+
+        let container = document.getElementById('groupMonthlySummaryContainer');
+        if(container) container.innerHTML = html;
+    }
+
+    function renderMachineStats() {
+        let counts = {};
+        dropdownData.machines.forEach(m => counts[m] = 0);
+        tableData.forEach(item => { if(item.machine) counts[item.machine] = (counts[item.machine] || 0) + 1; });
+        let sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+        let html = '<table><tr><th>機台</th><th>使用次數</th></tr>';
+        sorted.forEach(([k, v]) => { html += `<tr><td>${k}</td><td>${v}</td></tr>`; });
+        let container = document.getElementById('machineStats');
+        if(container) container.innerHTML = html + '</table>';
+    }
+
+    // ===== 日誌與工作量查詢設定 =====
+    function setupSearchFilters() {
+        const groupSel = document.getElementById('searchGroup');
+        if(groupSel) groupSel.innerHTML = '<option value="">全部組別</option><option value="志工">志工</option><option value="國際">國際</option>';
+
+        const writerSel = document.getElementById('searchWriter');
+        if(writerSel) {
+            writerSel.innerHTML = '<option value="">全部文字</option>';
+            for (let group in dropdownData.writers) {
+                dropdownData.writers[group].forEach(w => {
+                    writerSel.innerHTML += `<option value="${w}">${w}</option>`;
+                });
+            }
+        }
+
+        const editorSel = document.getElementById('searchEditor');
+        if(editorSel) {
+            editorSel.innerHTML = '<option value="">全部剪接</option>';
+            dropdownData.editors.forEach(e => editorSel.innerHTML += `<option value="${e}">${e}</option>`);
+        }
+
+        const catSel = document.getElementById('searchCategory');
+        if(catSel) {
+            catSel.innerHTML = '<option value="">全部類型</option>';
+            dropdownData.categories.forEach(c => catSel.innerHTML += `<option value="${c}">${c}</option>`);
+        }
+
+        const specialSel = document.getElementById('searchSpecialTag');
+        if(specialSel) {
+            specialSel.innerHTML = '<option value="">全部特別標記</option>';
+            dropdownData.specialTags.forEach(st => specialSel.innerHTML += `<option value="${st}">${st}</option>`);
+        }
+
+        const subSel = document.getElementById('searchSubtitle');
+        if(subSel) {
+            subSel.innerHTML = '<option value="">全部上字</option>';
+            dropdownData.subtitles.forEach(sub => subSel.innerHTML += `<option value="${sub}">${sub}</option>`);
+        }
+
+        const macSel = document.getElementById('searchMachine');
+        if(macSel) {
+            macSel.innerHTML = '<option value="">全部機台</option>';
+            dropdownData.machines.forEach(m => macSel.innerHTML += `<option value="${m}">${m}</option>`);
+        }
+
+        filterData();
+    }
+
+    function filterData() {
+        const kw = document.getElementById('searchKeyword')?.value.toLowerCase().trim() || "";
+        const dateVal = document.getElementById('searchDate')?.value || "";
+        const groupVal = document.getElementById('searchGroup')?.value || "";
+        const writerVal = document.getElementById('searchWriter')?.value || "";
+        const editorVal = document.getElementById('searchEditor')?.value || "";
+        const catVal = document.getElementById('searchCategory')?.value || "";
+        const specialVal = document.getElementById('searchSpecialTag')?.value || "";
+        const subVal = document.getElementById('searchSubtitle')?.value || "";
+        const macVal = document.getElementById('searchMachine')?.value || "";
+
+        let formattedSelectedDate = "";
+        if (dateVal) {
+            let parts = dateVal.split('-');
+            if (parts.length === 3) {
+                formattedSelectedDate = parseInt(parts[1]) + '/' + parseInt(parts[2]);
+            }
+        }
+
+        const filtered = tableData.filter(row => {
+            const matchKeyword = !kw || (row.slug || '').toLowerCase().includes(kw);
+            const matchDate = !formattedSelectedDate || (row.date || '') === formattedSelectedDate;
+            const matchGroup = !groupVal || (row.group || '') === groupVal;
+            const matchWriter = !writerVal || (row.writer || '') === writerVal;
+            const matchEditor = !editorVal || (row.editor || '') === editorVal;
+            const matchCat = !catVal || (row.category || '') === catVal;
+            const matchSpecial = !specialVal || (row.specialTag || '') === specialVal;
+            const matchSub = !subVal || (row.subtitle || '') === subVal;
+            const matchMac = !macVal || (row.machine || '') === macVal;
+
+            return matchKeyword && matchDate && matchGroup && matchWriter && matchEditor && matchCat && matchSpecial && matchSub && matchMac;
+        });
+
+        const tbody = document.getElementById('searchResultsBody');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        
+        filtered.forEach(row => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${row.date || ''}</td>
+                    <td>${row.group || ''}</td>
+                    <td style="text-align:left">${row.slug || ''}</td>
+                    <td>${row.writer || ''}</td>
+                    <td>${row.broadcastDate || ''}</td>
+                    <td>${row.category || ''}</td>
+                    <td>${row.timeSlot || ''}</td>
+                    <td>${row.specialTag || ''}</td>
+                    <td>${row.subtitle || ''}</td>
+                    <td>${row.editor || ''}</td>
+                    <td>${row.machine || ''}</td>
+                    <td>${row.note || ''}</td>
+                </tr>
+            `;
+        });
+
+        let countEl = document.getElementById('searchResultCount');
+        if(countEl) countEl.innerText = `符合條件筆數：${filtered.length} 筆`;
+    }
+
+    window.onload = function() {
+        loadDataFromCloud();
+    };
+</script>
+</body>
+</html>
