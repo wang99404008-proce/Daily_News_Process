@@ -2,47 +2,43 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.5">
-    <title>新聞產出管理系統（全功能雲端版）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>新聞產出管理系統（手機行動優化版）</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: "Microsoft JhengHei", Arial, sans-serif; background-color: #f4f6f9; color: #333; display: flex; height: 100vh; overflow: hidden; }
 
         /* 左側收折選單 */
-        .sidebar { width: 250px; background-color: #2c3e50; color: #fff; transition: all 0.3s ease; display: flex; flex-direction: column; flex-shrink: 0; }
-        .sidebar.collapsed { width: 60px; }
+        .sidebar { width: 250px; background-color: #2c3e50; color: #fff; transition: all 0.3s ease; display: flex; flex-direction: column; flex-shrink: 0; z-index: 100; }
         .sidebar-header { padding: 15px; background: #1a252f; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-header h3 { font-size: 16px; white-space: nowrap; overflow: hidden; }
-        .sidebar.collapsed .sidebar-header h3 { display: none; }
-        .toggle-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
         .nav-links { list-style: none; margin-top: 10px; }
         .nav-links li { padding: 15px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; white-space: nowrap; overflow: hidden; }
         .nav-links li:hover, .nav-links li.active { background-color: #34495e; border-left: 4px solid #3498db; }
         .nav-links li span.text { transition: opacity 0.2s; }
-        .sidebar.collapsed .nav-links li span.text { opacity: 0; display: none; }
 
         /* 主內容區 */
-        .main-content { flex: 1; padding: 20px; overflow-y: auto; background-color: #f4f6f9; }
+        .main-content { flex: 1; padding: 20px; overflow-y: auto; background-color: #f4f6f9; -webkit-overflow-scrolling: touch; }
         .page { display: none; }
         .page.active { display: block; }
         .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
         
         /* 工具列與按鈕 */
         .toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
-        button { padding: 8px 14px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        button { padding: 10px 16px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; }
         button:hover { background: #2980b9; }
         button.btn-success { background: #2ecc71; } button.btn-success:hover { background: #27ae60; }
         button.btn-danger { background: #e74c3c; } button.btn-danger:hover { background: #c0392b; }
-        .settings-box { background: #ecf0f1; padding: 12px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
 
-        /* 表格樣式 */
-        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; }
-        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: center; }
+        /* 表格與手機滑動優化容器 */
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; max-height: 60vh; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 950px; background: #fff; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: center; white-space: nowrap; }
         th { background-color: #2c3e50; color: white; position: sticky; top: 0; z-index: 10; }
         
         tr.unchecked-row { background-color: #fdf2f2 !important; }
         
-        input, select { width: 100%; padding: 5px; border: 1px solid transparent; background: transparent; border-radius: 4px; text-align: center; }
+        input, select { width: 100%; padding: 6px; border: 1px solid transparent; background: transparent; border-radius: 4px; text-align: center; font-size: 13px; }
         input:focus, select:focus { border: 1px solid #3498db; background: #fff; outline: none; }
         input[type="text"] { text-align: left; }
         
@@ -56,33 +52,48 @@
         .machine-free { background-color: #edf2f7; color: #a0aec0; border-color: #e2e8f0; } 
         
         /* 統計面板排版 */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
         .stat-card { background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-        .stat-card h4 { margin-bottom: 10px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .stat-card h4 { margin-bottom: 10px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         
-        /* 日誌查詢篩選面板 */
         .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 15px; background: #ecf0f1; padding: 15px; border-radius: 6px; }
         .matrix-table th { background: #34495e; color: #fff; font-size: 12px; }
         .matrix-table td { font-size: 12px; background: #fff; }
+
+        /* ===== 手機版 RWD 響應式優化 ===== */
+        @media screen and (max-width: 768px) {
+            body { flex-direction: column; height: auto; overflow: auto; }
+            .sidebar { width: 100% !important; height: auto; flex-direction: row; justify-content: space-between; align-items: center; }
+            .sidebar-header { width: auto; padding: 10px 15px; }
+            .nav-links { display: flex; width: 100%; margin-top: 0; }
+            .nav-links li { padding: 12px 10px; flex: 1; justify-content: center; font-size: 13px; border-left: none !important; border-bottom: 3px solid transparent; }
+            .nav-links li.active { border-bottom: 3px solid #3498db; background-color: #34495e; }
+            
+            .main-content { padding: 10px; height: auto; overflow: visible; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .filter-grid { grid-template-columns: 1fr; }
+            .card { padding: 12px; }
+            button { width: 100%; text-align: center; }
+            .toolbar { flex-direction: column; align-items: stretch; }
+        }
     </style>
 </head>
 <body>
 
-    <!-- 左側收折選單 -->
+    <!-- 導覽列 -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h3>新聞產出系統</h3>
-            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
         </div>
         <ul class="nav-links">
             <li class="active" onclick="switchPage('page1', this)">
-                <span>📋</span><span class="text">每日新聞產出表</span>
+                <span>📋</span><span class="text">每日產出</span>
             </li>
             <li onclick="switchPage('page2', this)">
-                <span>📊</span><span class="text">數據統計</span>
+                <span>📊</span><span class="text">統計</span>
             </li>
             <li onclick="switchPage('page3', this)">
-                <span>🔍</span><span class="text">日誌/資料查詢</span>
+                <span>🔍</span><span class="text">查詢</span>
             </li>
         </ul>
     </div>
@@ -94,21 +105,22 @@
             <div class="card">
                 <h2>📋 2026 每日新聞產出表</h2>
                 
-                <div style="margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">🖥️ 機台使用狀態即時預覽（藍色：未填剪接 / 飽和黃色：已填剪接）：</div>
+                <div style="margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">🖥️ 機台狀態即時預覽：</div>
                 <div id="machineStatusDashboard" class="machine-status-container"></div>
 
                 <div class="toolbar">
                     <button onclick="saveData()">💾 儲存並同步至雲端</button>
-                    <button onclick="loadDataFromCloud()" style="background: #27ae60;">🔄 重新載入雲端資料</button>
+                    <button onclick="loadDataFromCloud()" style="background: #27ae60;">🔄 重新載入雲端</button>
                     <span id="saveStatus" style="color: green; font-weight: bold;"></span>
                 </div>
-                <div style="overflow-x: auto; max-height: 60vh;">
+                <!-- 加上 .table-responsive 讓手機可以左右橫向滑動表格 -->
+                <div class="table-responsive">
                     <table>
                         <thead>
                             <tr>
                                 <th style="width: 70px;">製作日</th>
                                 <th style="width: 60px;">組別</th>
-                                <th>SLUG</th>
+                                <th style="min-width: 180px;">SLUG</th>
                                 <th style="width: 90px;">文字</th>
                                 <th style="width: 70px;">播出日</th>
                                 <th style="width: 75px;">類型</th>
@@ -118,7 +130,7 @@
                                 <th style="width: 80px;">剪接</th>
                                 <th style="width: 70px;">機台</th>
                                 <th style="width: 50px;">丟帶</th>
-                                <th>備註</th>
+                                <th style="min-width: 120px;">備註</th>
                                 <th style="width: 60px;">狀態</th>
                                 <th style="width: 40px;">刪除</th>
                             </tr>
@@ -132,69 +144,56 @@
         <!-- 頁面 2：專業數據統計 -->
         <div id="page2" class="page">
             <div class="card">
-                <h2>📊 專業數據統計與報表中心</h2>
+                <h2>📊 專業數據統計</h2>
                 <div class="stats-grid" style="margin-top: 15px;">
-                    
-                    <!-- 1. 每日各類型剪接績效矩陣 -->
                     <div class="stat-card" style="grid-column: 1 / -1;">
                         <h4>
-                            <span>🎬 每日各類型剪接績效矩陣</span>
-                            <input type="date" id="statDailyDate" onchange="renderDailyEditorMatrix()" style="width: 160px; font-size: 13px; border: 1px solid #cbd5e1; padding: 4px; background:#fff; border-radius:4px;">
+                            <span>🎬 每日各類型剪接績效</span>
+                            <input type="date" id="statDailyDate" onchange="renderDailyEditorMatrix()" style="width: 140px; font-size: 13px; border: 1px solid #cbd5e1; padding: 4px; background:#fff; border-radius:4px;">
                         </h4>
-                        <div style="overflow-x: auto;" id="matrixDailyEditorContainer"></div>
+                        <div class="table-responsive" id="matrixDailyEditorContainer"></div>
                     </div>
-
-                    <!-- 2. 月份各類型上字矩陣 -->
                     <div class="stat-card" style="grid-column: 1 / -1;">
                         <h4>
-                            <span>📝 每月各類型上字紀錄表</span>
-                            <div style="display:flex; gap:8px;">
-                                <select id="statMonthYear" onchange="renderMonthlySubtitleMatrix()" style="width: 90px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
-                                <select id="statMonthNum" onchange="renderMonthlySubtitleMatrix()" style="width: 80px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                            <span>📝 每月各類型上字紀錄</span>
+                            <div style="display:flex; gap:6px;">
+                                <select id="statMonthYear" onchange="renderMonthlySubtitleMatrix()" style="width: 75px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                                <select id="statMonthNum" onchange="renderMonthlySubtitleMatrix()" style="width: 70px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
                             </div>
                         </h4>
-                        <div style="overflow-x: auto;" id="matrixMonthlySubtitleContainer"></div>
+                        <div class="table-responsive" id="matrixMonthlySubtitleContainer"></div>
                     </div>
-
-                    <!-- 3. 個人年度每月上字與則數統計 -->
                     <div class="stat-card">
                         <h4>
-                            <span>👤 個人年度產出與上字統計</span>
-                            <div style="display:flex; gap:8px;">
-                                <select id="statPersonName" onchange="renderPersonalYearlyStats()" style="width: 90px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
-                                <select id="statPersonYear" onchange="renderPersonalYearlyStats()" style="width: 90px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                            <span>👤 個人年度產出</span>
+                            <div style="display:flex; gap:6px;">
+                                <select id="statPersonName" onchange="renderPersonalYearlyStats()" style="width: 75px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                                <select id="statPersonYear" onchange="renderPersonalYearlyStats()" style="width: 75px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
                             </div>
                         </h4>
-                        <div style="overflow-x: auto;" id="personalYearlyStatsContainer"></div>
+                        <div class="table-responsive" id="personalYearlyStatsContainer"></div>
                     </div>
-
-                    <!-- 4. 組別累積上字排行 -->
-                    <div class="stat-card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="stat-card" style="display: grid; grid-template-columns: 1fr; gap: 15px;">
                         <div>
                             <h4 style="color: #276749; border-bottom-color: #38a169;">🌍 國際組上字統計</h4>
-                            <div id="intlSubtitleRankingContainer"></div>
+                            <div class="table-responsive" id="intlSubtitleRankingContainer"></div>
                         </div>
                         <div>
                             <h4 style="color: #c05621; border-bottom-color: #ed8936;">🤝 志工組上字統計</h4>
-                            <div id="volunteerSubtitleRankingContainer"></div>
+                            <div class="table-responsive" id="volunteerSubtitleRankingContainer"></div>
                         </div>
                     </div>
-
-                    <!-- 5. 年度各組每月產出與日平均總表 -->
                     <div class="stat-card" style="grid-column: 1 / -1;">
                         <h4>
-                            <span>📈 年度各組每月產出與日平均總表</span>
-                            <select id="statGroupYear" onchange="renderGroupMonthlySummary()" style="width: 100px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
+                            <span>📈 各組每月產出總表</span>
+                            <select id="statGroupYear" onchange="renderGroupMonthlySummary()" style="width: 80px; padding:3px; background:#fff; border:1px solid #ccc;"></select>
                         </h4>
-                        <div style="overflow-x: auto;" id="groupMonthlySummaryContainer"></div>
+                        <div class="table-responsive" id="groupMonthlySummaryContainer"></div>
                     </div>
-
-                    <!-- 6. 機台使用次數排行 -->
                     <div class="stat-card">
                         <h4>💻 機台使用次數排行</h4>
-                        <div style="overflow-x: auto; max-height: 250px;" id="machineStats"></div>
+                        <div class="table-responsive" id="machineStats"></div>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -205,7 +204,7 @@
                 <h2>🔍 日誌查詢</h2>
                 <div class="filter-grid">
                     <input type="text" id="searchKeyword" oninput="filterData()" placeholder="🔍 搜尋 SLUG..." style="border: 1px solid #cbd5e1; background: #fff;">
-                    <input type="date" id="searchDate" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;" title="選擇日曆日期">
+                    <input type="date" id="searchDate" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;">
                     <select id="searchGroup" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部組別</option></select>
                     <select id="searchWriter" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部文字</option></select>
                     <select id="searchEditor" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部剪接</option></select>
@@ -215,7 +214,7 @@
                     <select id="searchMachine" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;"><option value="">全部機台</option></select>
                 </div>
                 <div style="margin-bottom: 10px; font-weight: bold; color: #555;" id="searchResultCount">符合條件筆數：0 筆</div>
-                <div style="overflow-x: auto; max-height: 55vh;">
+                <div class="table-responsive" style="max-height: 50vh;">
                     <table>
                         <thead>
                             <tr>
@@ -242,7 +241,7 @@
 
 <script>
     // ===== 請在這裡貼上你從 Google Apps Script 取得的「網頁應用程式網址」 =====
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbykLhDHqpdntQZ2M5DhVNc-0QiZLo1VSmof18L4tzn7ek3rNkMZWGhyiEwIRosxRx2L/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzK0QW9TPRJDSzjNQmg0g6aa7LTZdQ2ub8k2dadrLT72HAFGBpkMwh9xIV0fIeC445/exec";
 
     let dropdownData = {
         writers: {
@@ -258,7 +257,6 @@
 
     let tableData = [];
 
-    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
     function switchPage(pageId, element) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.nav-links li').forEach(li => li.classList.remove('active'));
@@ -273,13 +271,13 @@
             alert("請先在程式碼中填入你的 Google 網頁應用程式網址！");
             return;
         }
-        document.getElementById('saveStatus').innerText = "🔄 正在同步雲端資料...";
+        document.getElementById('saveStatus').innerText = "🔄 同步中...";
         fetch(WEB_APP_URL)
             .then(response => response.json())
             .then(data => {
                 tableData = data || [];
                 renderTable();
-                document.getElementById('saveStatus').innerText = "✅ 雲端同步完成";
+                document.getElementById('saveStatus').innerText = "✅ 同步完成";
                 setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 2000);
             })
             .catch(error => {
@@ -293,7 +291,7 @@
             alert("請先在程式碼中填入你的 Google 網頁應用程式網址！");
             return;
         }
-        document.getElementById('saveStatus').innerText = "💾 正在儲存至雲端...";
+        document.getElementById('saveStatus').innerText = "💾 儲存中...";
         fetch(WEB_APP_URL, {
             method: 'POST',
             mode: 'no-cors',
@@ -301,7 +299,7 @@
             body: JSON.stringify(tableData)
         })
         .then(() => {
-            document.getElementById('saveStatus').innerText = "✅ 雲端儲存成功";
+            document.getElementById('saveStatus').innerText = "✅ 儲存成功";
             setTimeout(() => { document.getElementById('saveStatus').innerText = ""; }, 2000);
         })
         .catch(error => {
@@ -376,7 +374,6 @@
             tbody.appendChild(tr);
         });
 
-        // 底部新增列
         let newTr = document.createElement('tr');
         newTr.className = "add-row-tr";
         newTr.style.background = "#eef2f7";
@@ -395,7 +392,7 @@
             <td><input type="checkbox" id="new_checked" checked></td>
             <td><input type="text" id="new_note" placeholder="備註"></td>
             <td><input type="text" id="new_status" value="完成"></td>
-            <td><button class="btn-success" style="padding:2px 6px;" onclick="submitNewRow()">＋</button></td>
+            <td><button class="btn-success" style="padding:4px 8px;" onclick="submitNewRow()">＋ 新增</button></td>
         `;
         tbody.appendChild(newTr);
         renderMachineDashboard();
@@ -541,7 +538,6 @@
         });
     }
 
-    // ===== 統計圖表渲染邏輯 =====
     function initStatisticsPage() {
         const dateInput = document.getElementById('statDailyDate');
         if (dateInput && !dateInput.value) {
@@ -798,7 +794,6 @@
         if(container) container.innerHTML = html + '</table>';
     }
 
-    // ===== 日誌與工作量查詢設定 =====
     function setupSearchFilters() {
         const groupSel = document.getElementById('searchGroup');
         if(groupSel) groupSel.innerHTML = '<option value="">全部組別</option><option value="志工">志工</option><option value="國際">國際</option>';
