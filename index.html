@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>新聞產出管理系統（手機行動優化版）</title>
+    <title>新聞產出管理系統（即時機台連動版）</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: "Microsoft JhengHei", Arial, sans-serif; background-color: #f4f6f9; color: #333; display: flex; height: 100vh; overflow: hidden; }
@@ -105,7 +105,7 @@
             <div class="card">
                 <h2>📋 2026 每日新聞產出表</h2>
                 
-                <div style="margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">🖥️ 機台狀態即時預覽：</div>
+                <div style="margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">🖥️ 機台狀態即時預覽（藍色：未填剪接 / 黃色：已填剪接）：</div>
                 <div id="machineStatusDashboard" class="machine-status-container"></div>
 
                 <div class="toolbar">
@@ -113,7 +113,6 @@
                     <button onclick="loadDataFromCloud()" style="background: #27ae60;">🔄 重新載入雲端</button>
                     <span id="saveStatus" style="color: green; font-weight: bold;"></span>
                 </div>
-                <!-- 加上 .table-responsive 讓手機可以左右橫向滑動表格 -->
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -201,7 +200,7 @@
         <!-- 頁面 3：日誌查詢 -->
         <div id="page3" class="page">
             <div class="card">
-                <h2>🔍 日誌查詢</h2>
+                <h2>🔍 日誌與工作查詢</h2>
                 <div class="filter-grid">
                     <input type="text" id="searchKeyword" oninput="filterData()" placeholder="🔍 搜尋 SLUG..." style="border: 1px solid #cbd5e1; background: #fff;">
                     <input type="date" id="searchDate" onchange="filterData()" style="border: 1px solid #cbd5e1; background: #fff;">
@@ -241,7 +240,7 @@
 
 <script>
     // ===== 請在這裡貼上你從 Google Apps Script 取得的「網頁應用程式網址」 =====
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxzK0QW9TPRJDSzjNQmg0g6aa7LTZdQ2ub8k2dadrLT72HAFGBpkMwh9xIV0fIeC445/exec";
+    const WEB_APP_URL = "在此貼上你的Google網址";
 
     let dropdownData = {
         writers: {
@@ -267,7 +266,7 @@
     }
 
     function loadDataFromCloud() {
-        if(WEB_APP_URL.includes("在此貼上")) {
+        if(WEB_APP_URL.includes("https://script.google.com/macros/s/AKfycbxzK0QW9TPRJDSzjNQmg0g6aa7LTZdQ2ub8k2dadrLT72HAFGBpkMwh9xIV0fIeC445/exec")) {
             alert("請先在程式碼中填入你的 Google 網頁應用程式網址！");
             return;
         }
@@ -387,8 +386,8 @@
             <td><input type="text" id="new_timeSlot" value="-"></td>
             <td><select id="new_specialTag"><option value="-">-</option>${getOptionsHTML('specialTags', '')}</select></td>
             <td><select id="new_subtitle"><option value="-">-</option>${getOptionsHTML('subtitles', '')}</select></td>
-            <td><select id="new_editor"><option value="">請選擇</option>${getOptionsHTML('editors', '')}</select></td>
-            <td><select id="new_machine"><option value="">請選擇</option>${getOptionsHTML('machines', '')}</select></td>
+            <td><select id="new_editor" onchange="renderMachineDashboard()"><option value="">請選擇</option>${getOptionsHTML('editors', '')}</select></td>
+            <td><select id="new_machine" onchange="renderMachineDashboard()"><option value="">請選擇</option>${getOptionsHTML('machines', '')}</select></td>
             <td><input type="checkbox" id="new_checked" checked></td>
             <td><input type="text" id="new_note" placeholder="備註"></td>
             <td><input type="text" id="new_status" value="完成"></td>
@@ -482,7 +481,8 @@
             let selected = (item === currentValue) ? 'selected' : '';
             options += `<option value="${item}" ${selected}>${item}</option>`;
         });
-        return `<select onchange="updateData(${rowIndex}, '${fieldName}', this.value)">${options}</select>`;
+        // 加上 onchange 時即時觸發機台顏色面板更新
+        return `<select onchange="updateData(${rowIndex}, '${fieldName}', this.value); renderMachineDashboard();">${options}</select>`;
     }
 
     function checkDirectAdd(e) { if (e.key === 'Enter') submitNewRow(); }
@@ -517,15 +517,32 @@
         if(confirm('確定刪除？')) { tableData.splice(index, 1); saveData(); renderTable(); } 
     }
 
-    function updateData(index, field, value) { tableData[index][field] = value; }
-    function updateSlug(index, val) { tableData[index].slug = val; parseSlugAuto(val, index); renderTable(); }
+    function updateData(index, field, value) { 
+        tableData[index][field] = value; 
+        renderMachineDashboard(); // 每次修改欄位時立刻同步機台狀態
+    }
+    
+    function updateSlug(index, val) { 
+        tableData[index].slug = val; 
+        parseSlugAuto(val, index); 
+        renderTable(); 
+    }
 
     function renderMachineDashboard() {
         const dashboard = document.getElementById('machineStatusDashboard');
         if(!dashboard) return;
         dashboard.innerHTML = '';
+        
+        // 同時抓取表格已有資料與下方新增列正在選取的暫存資料來即時預覽
+        let liveTableData = [...tableData];
+        const tempMachine = document.getElementById('new_machine')?.value;
+        const tempEditor = document.getElementById('new_editor')?.value;
+        if (tempMachine && tempMachine !== "") {
+            liveTableData.push({ machine: tempMachine, editor: tempEditor || "" });
+        }
+
         dropdownData.machines.forEach(mach => {
-            let assignedRows = tableData.filter(row => row.machine === mach);
+            let assignedRows = liveTableData.filter(row => row.machine === mach);
             let badgeClass = "machine-free";
             if (assignedRows.length > 0) {
                 let hasEditor = assignedRows.some(row => row.editor && row.editor.trim() !== "");
